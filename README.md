@@ -161,7 +161,6 @@ _Add Postman screenshots here (create, read, update, delete, and an error case).
 ## 📸 API Demo & Screenshots
 
 ### 1. Create Salesforce Account (POST)
-<img width="1580" height="1012" alt="Get" src="https://github.com/user-attachments/assets/65fafa0a-ed65-4d80-9d13-951aaabfdb3c" />
 <img width="1578" height="1007" alt="Post" src="https://github.com/user-attachments/assets/5ceddd4f-b73f-42be-84ce-0a494ff763c2" />
 
 
