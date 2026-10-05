@@ -1,0 +1,27 @@
+# ---------- Secrets (never commit) ----------
+src/main/resources/config.properties
+src/main/resources/*.local.properties
+*.pem
+*.jks
+*.p12
+
+# ---------- Mule / Maven build output ----------
+target/
+.mule/
+bin/
+.tooling-project/
+dependency-reduced-pom.xml
+
+# ---------- IDE / OS ----------
+.vscode/
+.idea/
+.classpath
+.project
+.settings/
+*.code-workspace
+.DS_Store
+Thumbs.db
+
+# ---------- Logs ----------
+*.log
+signal.txt

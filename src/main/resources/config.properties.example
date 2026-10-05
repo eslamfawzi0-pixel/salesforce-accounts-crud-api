@@ -1,0 +1,7 @@
+http.host=0.0.0.0
+http.port=8081
+
+# Salesforce External Client App (OAuth 2.0 Client Credentials)
+sf.clientId=YOUR_CONSUMER_KEY
+sf.clientSecret=YOUR_CONSUMER_SECRET
+sf.tokenUrl=https://YOUR-DOMAIN.my.salesforce.com/services/oauth2/token

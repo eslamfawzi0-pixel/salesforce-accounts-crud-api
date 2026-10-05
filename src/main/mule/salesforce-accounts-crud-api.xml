@@ -1,0 +1,290 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mule xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+      xmlns:salesforce="http://www.mulesoft.org/schema/mule/salesforce"
+      xmlns:http="http://www.mulesoft.org/schema/mule/http"
+      xmlns="http://www.mulesoft.org/schema/mule/core"
+      xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xsi:schemaLocation="
+        http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+        http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+        http://www.mulesoft.org/schema/mule/salesforce http://www.mulesoft.org/schema/mule/salesforce/current/mule-salesforce.xsd
+        http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
+
+    <!-- ===================== Global error handler ===================== -->
+    <error-handler name="global-error-handler">
+
+        <on-error-continue type="APP:BAD_REQUEST" logException="false" doc:name="400 Bad Request">
+            <ee:transform doc:name="Build 400">
+                <ee:message>
+                    <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{ error: "BAD_REQUEST", message: error.description }]]></ee:set-payload>
+                </ee:message>
+                <ee:variables>
+                    <ee:set-variable variableName="httpStatus"><![CDATA[400]]></ee:set-variable>
+                </ee:variables>
+            </ee:transform>
+        </on-error-continue>
+
+        <on-error-continue type="APP:NOT_FOUND" logException="false" doc:name="404 Not Found">
+            <ee:transform doc:name="Build 404">
+                <ee:message>
+                    <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{ error: "NOT_FOUND", message: error.description }]]></ee:set-payload>
+                </ee:message>
+                <ee:variables>
+                    <ee:set-variable variableName="httpStatus"><![CDATA[404]]></ee:set-variable>
+                </ee:variables>
+            </ee:transform>
+        </on-error-continue>
+
+        <on-error-continue type="SALESFORCE:CONNECTIVITY" doc:name="503 Salesforce unavailable">
+            <ee:transform doc:name="Build 503">
+                <ee:message>
+                    <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{ error: "SERVICE_UNAVAILABLE", message: "Could not connect to Salesforce" }]]></ee:set-payload>
+                </ee:message>
+                <ee:variables>
+                    <ee:set-variable variableName="httpStatus"><![CDATA[503]]></ee:set-variable>
+                </ee:variables>
+            </ee:transform>
+        </on-error-continue>
+
+        <on-error-continue type="ANY" doc:name="500 Internal Error">
+            <logger level="ERROR" message="#[error.description]" doc:name="Log error"/>
+            <ee:transform doc:name="Build 500">
+                <ee:message>
+                    <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{ error: "INTERNAL_ERROR", message: "Unexpected error. Please try again later." }]]></ee:set-payload>
+                </ee:message>
+                <ee:variables>
+                    <ee:set-variable variableName="httpStatus"><![CDATA[500]]></ee:set-variable>
+                </ee:variables>
+            </ee:transform>
+        </on-error-continue>
+
+    </error-handler>
+
+    <!-- ===================== Health ===================== -->
+    <flow name="health-check-flow">
+        <http:listener config-ref="HTTP_Listener_config" path="/health" doc:name="GET /health"/>
+        <set-payload value="API is running" doc:name="Set Payload"/>
+    </flow>
+
+    <!-- ===================== READ (list) ===================== -->
+    <flow name="get-accounts-flow">
+        <http:listener config-ref="HTTP_Listener_config" path="/accounts" allowedMethods="GET" doc:name="GET /accounts"/>
+
+        <salesforce:query config-ref="Salesforce_OAuth_Config" doc:name="Query Accounts">
+            <salesforce:salesforce-query><![CDATA[SELECT Id, Name, Industry, Phone FROM Account LIMIT 10]]></salesforce:salesforce-query>
+        </salesforce:query>
+
+        <ee:transform doc:name="Transform to JSON">
+            <ee:message>
+                <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+payload map (acc) -> acc - "type"]]></ee:set-payload>
+            </ee:message>
+        </ee:transform>
+    </flow>
+
+    <!-- ===================== READ (by Id, with error handling) ===================== -->
+    <flow name="get-account-by-id-flow">
+        <http:listener config-ref="HTTP_Listener_config" path="/accounts/{id}" allowedMethods="GET" doc:name="GET /accounts/{id}">
+            <http:response statusCode="#[vars.httpStatus default 200]"/>
+        </http:listener>
+
+        <choice doc:name="Validate Id">
+            <when expression="#[not (attributes.uriParams.id matches /^[a-zA-Z0-9]{15,18}$/)]">
+                <raise-error type="APP:BAD_REQUEST" description="Invalid Account Id format"/>
+            </when>
+        </choice>
+
+        <salesforce:query config-ref="Salesforce_OAuth_Config" doc:name="Query Account by Id">
+            <salesforce:salesforce-query><![CDATA[SELECT Id, Name, Industry, Phone FROM Account WHERE Id = ':id']]></salesforce:salesforce-query>
+            <salesforce:parameters><![CDATA[#[{ id: attributes.uriParams.id }]]]></salesforce:parameters>
+        </salesforce:query>
+
+        <ee:transform doc:name="To list">
+            <ee:message>
+                <ee:set-payload><![CDATA[%dw 2.0
+output application/java
+---
+payload map (acc) -> acc - "type"]]></ee:set-payload>
+            </ee:message>
+        </ee:transform>
+
+        <choice doc:name="Found?">
+            <when expression="#[isEmpty(payload)]">
+                <raise-error type="APP:NOT_FOUND" description="Account not found"/>
+            </when>
+        </choice>
+
+        <ee:transform doc:name="Return first account">
+            <ee:message>
+                <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+payload[0]]]></ee:set-payload>
+            </ee:message>
+        </ee:transform>
+
+        <error-handler ref="global-error-handler"/>
+    </flow>
+
+    <!-- ===================== CREATE (with error handling) ===================== -->
+    <flow name="create-account-flow">
+        <http:listener config-ref="HTTP_Listener_config" path="/accounts" allowedMethods="POST" doc:name="POST /accounts">
+            <http:response statusCode="#[vars.httpStatus default 200]"/>
+        </http:listener>
+
+        <choice doc:name="Validate name">
+            <when expression="#[isEmpty(payload.name default '')]">
+                <raise-error type="APP:BAD_REQUEST" description="Field 'name' is required"/>
+            </when>
+        </choice>
+
+        <ee:transform doc:name="Map request to Account">
+            <ee:message>
+                <ee:set-payload><![CDATA[%dw 2.0
+output application/java
+---
+[{
+  Name: payload.name,
+  (Industry: payload.industry) if payload.industry?,
+  (Phone: payload.phone) if payload.phone?
+}]]]></ee:set-payload>
+            </ee:message>
+        </ee:transform>
+
+        <salesforce:create config-ref="Salesforce_OAuth_Config" type="Account" doc:name="Create Account"/>
+
+        <ee:transform doc:name="Build response">
+            <ee:message>
+                <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+if (payload.successful)
+  { id: payload.items[0].id, message: "Account created" }
+else
+  { error: "SALESFORCE_ERROR", message: payload.items[0].exception.message default "Salesforce rejected the request" }]]></ee:set-payload>
+            </ee:message>
+            <ee:variables>
+                <ee:set-variable variableName="httpStatus"><![CDATA[if (payload.successful) 201 else 400]]></ee:set-variable>
+            </ee:variables>
+        </ee:transform>
+
+        <error-handler ref="global-error-handler"/>
+    </flow>
+
+    <!-- ===================== UPDATE (with error handling) ===================== -->
+    <flow name="update-account-flow">
+        <http:listener config-ref="HTTP_Listener_config" path="/accounts/{id}" allowedMethods="PUT" doc:name="PUT /accounts/{id}">
+            <http:response statusCode="#[vars.httpStatus default 200]"/>
+        </http:listener>
+
+        <choice doc:name="Validate Id">
+            <when expression="#[not (attributes.uriParams.id matches /^[a-zA-Z0-9]{15,18}$/)]">
+                <raise-error type="APP:BAD_REQUEST" description="Invalid Account Id format"/>
+            </when>
+        </choice>
+
+        <choice doc:name="Validate body">
+            <when expression="#[isEmpty(payload.name default '') and isEmpty(payload.industry default '') and isEmpty(payload.phone default '')]">
+                <raise-error type="APP:BAD_REQUEST" description="Send at least one of: name, industry, phone"/>
+            </when>
+        </choice>
+
+        <ee:transform doc:name="Map request to Account">
+            <ee:message>
+                <ee:set-payload><![CDATA[%dw 2.0
+output application/java
+---
+[{
+  Id: attributes.uriParams.id,
+  (Name: payload.name) if payload.name?,
+  (Industry: payload.industry) if payload.industry?,
+  (Phone: payload.phone) if payload.phone?
+}]]]></ee:set-payload>
+            </ee:message>
+        </ee:transform>
+
+        <salesforce:update config-ref="Salesforce_OAuth_Config" type="Account" doc:name="Update Account"/>
+
+        <ee:transform doc:name="Build response">
+            <ee:message>
+                <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+var msg = payload.items[0].exception.message default "Salesforce rejected the request"
+var notFound = (msg contains "INVALID_CROSS_REFERENCE_KEY") or (msg contains "ENTITY_IS_DELETED")
+---
+if (payload.successful)
+  { id: payload.items[0].id, message: "Account updated" }
+else if (notFound)
+  { error: "NOT_FOUND", message: "Account not found" }
+else
+  { error: "SALESFORCE_ERROR", message: msg }]]></ee:set-payload>
+            </ee:message>
+            <ee:variables>
+                <ee:set-variable variableName="httpStatus"><![CDATA[if (payload.successful) 200 else if (((payload.items[0].exception.message default "") contains "INVALID_CROSS_REFERENCE_KEY") or ((payload.items[0].exception.message default "") contains "ENTITY_IS_DELETED")) 404 else 400]]></ee:set-variable>
+            </ee:variables>
+        </ee:transform>
+
+        <error-handler ref="global-error-handler"/>
+    </flow>
+
+    <!-- ===================== DELETE (with error handling) ===================== -->
+    <flow name="delete-account-flow">
+        <http:listener config-ref="HTTP_Listener_config" path="/accounts/{id}" allowedMethods="DELETE" doc:name="DELETE /accounts/{id}">
+            <http:response statusCode="#[vars.httpStatus default 200]"/>
+        </http:listener>
+
+        <choice doc:name="Validate Id">
+            <when expression="#[not (attributes.uriParams.id matches /^[a-zA-Z0-9]{15,18}$/)]">
+                <raise-error type="APP:BAD_REQUEST" description="Invalid Account Id format"/>
+            </when>
+        </choice>
+
+        <ee:transform doc:name="Id to delete">
+            <ee:message>
+                <ee:set-payload><![CDATA[%dw 2.0
+output application/java
+---
+[attributes.uriParams.id]]]></ee:set-payload>
+            </ee:message>
+        </ee:transform>
+
+        <salesforce:delete config-ref="Salesforce_OAuth_Config" doc:name="Delete Account"/>
+
+        <ee:transform doc:name="Build response">
+            <ee:message>
+                <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+var msg = payload.items[0].exception.message default "Salesforce rejected the request"
+var notFound = (msg contains "INVALID_CROSS_REFERENCE_KEY") or (msg contains "ENTITY_IS_DELETED")
+---
+if (payload.successful)
+  { id: payload.items[0].id, message: "Account deleted" }
+else if (notFound)
+  { error: "NOT_FOUND", message: "Account not found" }
+else
+  { error: "SALESFORCE_ERROR", message: msg }]]></ee:set-payload>
+            </ee:message>
+            <ee:variables>
+                <ee:set-variable variableName="httpStatus"><![CDATA[if (payload.successful) 200 else if (((payload.items[0].exception.message default "") contains "INVALID_CROSS_REFERENCE_KEY") or ((payload.items[0].exception.message default "") contains "ENTITY_IS_DELETED")) 404 else 400]]></ee:set-variable>
+            </ee:variables>
+        </ee:transform>
+
+        <error-handler ref="global-error-handler"/>
+    </flow>
+
+</mule>
