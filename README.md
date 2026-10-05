@@ -161,20 +161,23 @@ _Add Postman screenshots here (create, read, update, delete, and an error case).
 ## 📸 API Demo & Screenshots
 
 ### 1. Create Salesforce Account (POST)
-<img width="800" height="427" alt="Post" src="https://github.com/user-attachments/assets/9222835f-2a25-411a-83fd-550a18e7a268" />
+<img width="1580" height="1012" alt="Get" src="https://github.com/user-attachments/assets/65fafa0a-ed65-4d80-9d13-951aaabfdb3c" />
+<img width="1578" height="1007" alt="Post" src="https://github.com/user-attachments/assets/5ceddd4f-b73f-42be-84ce-0a494ff763c2" />
 
 
 ### 2. Get Account Details (GET)
-<img width="800" height="423" alt="Get" src="https://github.com/user-attachments/assets/01ebb7c7-1bc8-4252-a2df-124a99cafa5e" />
+<img width="1580" height="1012" alt="Get" src="https://github.com/user-attachments/assets/137c4668-4347-4b56-b9f7-c9975d86a1f9" />
 
 
 ### 3. Update Salesforce Account (Put)
-<img width="800" height="423" alt="Put" src="https://github.com/user-attachments/assets/1c600ca3-11e7-447c-a39b-bc129008b11d" />
+<img width="1575" height="1016" alt="Put" src="https://github.com/user-attachments/assets/c0d42c2f-480d-4288-82ab-b60f22c3a774" />
+
 
 ### 4. Delete Salesforce Account (DELETE)
-<img width="800" height="424" alt="Delete" src="https://github.com/user-attachments/assets/09d44794-e32e-4133-888e-e0af53f4c9d1" />
+<img width="1575" height="1011" alt="Delete" src="https://github.com/user-attachments/assets/b7e72b0a-1965-46cb-8ce0-6f19fcdf4c55" />
+
 
 ### 5. Error Handling Case (404 Not Found)
-<img width="1577" height="991" alt="Delete2 Not Found" src="https://github.com/user-attachments/assets/0a1571d7-1436-42c1-ae7b-cb512095b76a" />
+<img width="1583" height="1012" alt="Error Handling" src="https://github.com/user-attachments/assets/4d1f4254-5b8a-4c5e-8edb-09b28bff3682" />
 
 
