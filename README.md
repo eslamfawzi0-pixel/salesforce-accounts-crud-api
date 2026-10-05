@@ -158,3 +158,10 @@ mule-artifact.json
 ## Screenshots
 
 _Add Postman screenshots here (create, read, update, delete, and an error case). Hide any keys, secrets or tokens before saving them._
+## 📸 API Demo & Screenshots
+
+### 1. Create Salesforce Account (POST)
+![Create Account](docs/create-account.png)
+
+### 2. Get Account Details (GET)
+![Get Account](docs/get-accounts.png)
